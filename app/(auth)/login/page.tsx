@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { authService } from "@/lib/services/auth.service";
 import Input from "@/components/ui/input";
 import Button from "@/components/ui/button";
-import { Mail, ShieldCheck, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, ShieldCheck, Lock } from "lucide-react";
 
 const SUPER_ADMIN_ROLE = "super_admin";
 
@@ -13,7 +13,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(formData: FormData) {
     setError("");
@@ -80,7 +79,7 @@ export default function LoginPage() {
 
             <Input
               name="password"
-              type={showPassword ? "text" : "password"}
+              type="password"
               label="Password"
               placeholder="••••••••"
               autoComplete="current-password"
@@ -88,16 +87,6 @@ export default function LoginPage() {
               dark
               inputSize="lg"
               leftIcon={<Lock className="w-4 h-4" />}
-              rightIcon={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="text-slate-400 hover:text-slate-200 transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              }
             />
 
             {error && (

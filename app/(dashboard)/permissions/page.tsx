@@ -20,6 +20,8 @@ export default function PermissionsPage() {
   const load = useCallback(async (page: number, q: string) => {
     setLoading(true);
     setError("");
+
+
     try {
       const { data } = await permissionService.getAll({ page, limit: LIMIT, search: q || undefined });
       const items = data.data;
@@ -45,7 +47,7 @@ export default function PermissionsPage() {
     <div className="flex flex-col h-full">
       <Header title="Permissions" />
 
-      <div className="flex-1 p-6 space-y-5">
+      <div className="flex-1 p-6 flex flex-col gap-5 min-h-0">
         {/* Top bar */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
@@ -56,26 +58,30 @@ export default function PermissionsPage() {
           <SearchBar placeholder="Search permissions..." onSearch={setSearch} />
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <PermissionsTable
-            permissions={permissions}
-            loading={loading}
-            error={error}
-            page={pagination.page}
-            limit={LIMIT}
-          />
-        </div>
+        {/* Table + fixed pagination */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="overflow-y-auto flex-1">
+            <PermissionsTable
+              permissions={permissions}
+              loading={loading}
+              error={error}
+              page={pagination.page}
+              limit={LIMIT}
+            />
+          </div>
 
-        {/* Pagination */}
-        {!loading && (
-          <Pagination
-            page={pagination.page}
-            totalPages={pagination.totalPages}
-            total={pagination.total}
-            onPageChange={(p) => load(p, search)}
-          />
-        )}
+          {/* Pagination pinned at bottom */}
+         
+            <div className="shrink-0">
+              <Pagination
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                total={pagination.total}
+                onPageChange={(p) => load(p, search)}
+              />
+            </div>
+      
+        </div>
       </div>
     </div>
   );

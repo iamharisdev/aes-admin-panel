@@ -1,5 +1,25 @@
+"use client";
+
+import { useState } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Eye, EyeOff } from "lucide-react";
+
+// ─── Password Toggle ──────────────────────────────────────────────────────────
+
+function PasswordToggle({ show, onToggle, dark }: { show: boolean; onToggle: () => void; dark: boolean }) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      onClick={onToggle}
+      className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${
+        dark ? "text-slate-400 hover:text-slate-200" : "text-gray-400 hover:text-gray-600"
+      }`}
+    >
+      {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+    </button>
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,12 +56,16 @@ export default function Input({
   dark = false,
   className = "",
   id,
+  type,
   ...props
 }: InputProps) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
+
   const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
   const { input: inputSz, icon: iconSz } = sizeClasses[inputSize];
   const hasLeft = Boolean(leftIcon);
-  const hasRight = Boolean(rightIcon);
+  const hasRight = Boolean(rightIcon) || isPassword;
 
   const baseInput = dark
     ? "bg-white/5 border-white/10 text-white placeholder-slate-500 focus:ring-green-500"
@@ -50,7 +74,7 @@ export default function Input({
     : "bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:ring-green-500";
 
   return (
-    <div className="flex flex-col gap-1.5 w-full">
+    <div className="flex flex-col gap-1.5 w-full ">
       {label && (
         <label
           htmlFor={inputId}
@@ -60,7 +84,7 @@ export default function Input({
         </label>
       )}
 
-      <div className="relative flex items-center">
+      <div className="relative flex items-center shadow-sm">
         {hasLeft && (
           <span
             className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${
@@ -73,6 +97,7 @@ export default function Input({
 
         <input
           id={inputId}
+          type={isPassword ? (showPassword ? "text" : "password") : type}
           className={[
             "w-full rounded-xl border outline-none transition-all",
             "focus:ring-2 focus:border-transparent",
@@ -88,7 +113,13 @@ export default function Input({
           {...props}
         />
 
-        {hasRight && (
+        {isPassword ? (
+          <PasswordToggle
+            show={showPassword}
+            onToggle={() => setShowPassword((v) => !v)}
+            dark={dark}
+          />
+        ) : hasRight && (
           <span
             className={`absolute right-3 top-1/2 -translate-y-1/2 ${
               dark ? "text-slate-400" : "text-gray-400"
