@@ -51,6 +51,38 @@ export interface Role {
   permissions?: RolePermission[];
 }
 
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string;
+  roleId: string;
+  hospitalId?: string;
+  isActive: "Y" | "N";
+  role?: Role;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateUserPayload {
+  name: string;
+  email: string;
+  phoneNumber?: string;
+  password: string;
+  roleId: string;
+  isActive?: "Y" | "N";
+}
+
+export interface UpdateUserPayload {
+  name?: string;
+  email?: string;
+  phoneNumber?: string;
+  roleId?: string;
+  isActive?: "Y" | "N";
+}
+
 // ─── API Wrappers ─────────────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {
