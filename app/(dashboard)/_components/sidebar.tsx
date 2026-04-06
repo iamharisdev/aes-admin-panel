@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, ShieldCheck, LogOut } from "lucide-react";
+import { Users, ShieldCheck, LogOut, UserCircle } from "lucide-react";
 
 const navItems = [
+  {
+    href: "/users",
+    label: "Users",
+    icon: <UserCircle className="w-4 h-4" />,
+  },
   {
     href: "/roles",
     label: "Roles",

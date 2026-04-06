@@ -1,10 +1,11 @@
 import api from "@/lib/axios";
-import type { ApiResponse, PaginatedResponse, User } from "@/types";
+import type { ApiResponse, PaginatedResponse, User, CreateUserPayload, UpdateUserPayload } from "@/types";
 
 export interface GetUsersParams {
   page?: number;
-  pageSize?: number;
+  limit?: number;
   search?: string;
+  isActive?: "Y" | "N";
 }
 
 export const userService = {
@@ -13,11 +14,11 @@ export const userService = {
 
   getById: (id: string) => api.get<ApiResponse<User>>(`/users/${id}`),
 
-  create: (payload: Omit<User, "id" | "createdAt">) =>
+  create: (payload: CreateUserPayload) =>
     api.post<ApiResponse<User>>("/users", payload),
 
-  update: (id: string, payload: Partial<User>) =>
+  update: (id: string, payload: UpdateUserPayload) =>
     api.patch<ApiResponse<User>>(`/users/${id}`, payload),
 
-  remove: (id: string) => api.delete(`/users/${id}`),
+  remove: (id: string) => api.delete<ApiResponse<null>>(`/users/${id}`),
 };
