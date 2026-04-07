@@ -72,6 +72,7 @@ export interface CreateUserPayload {
   phoneNumber?: string;
   password: string;
   roleId: string;
+  hospitalId?: string;
   isActive?: "Y" | "N";
 }
 
@@ -80,8 +81,46 @@ export interface UpdateUserPayload {
   email?: string;
   phoneNumber?: string;
   roleId?: string;
+  hospitalId?: string;
   isActive?: "Y" | "N";
 }
+
+// ─── Hospital ─────────────────────────────────────────────────────────────────
+
+export interface Hospital {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  email?: string;
+  licenseNumber?: string;
+  contactPerson?: string;
+  contactPersonPhone?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country: string;
+  isActive: "Y" | "N";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateHospitalPayload {
+  name: string;
+  address: string;
+  phone: string;
+  email?: string;
+  licenseNumber?: string;
+  contactPerson?: string;
+  contactPersonPhone?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+  isActive?: "Y" | "N";
+}
+
+export interface UpdateHospitalPayload extends Partial<CreateHospitalPayload> {}
 
 // ─── API Wrappers ─────────────────────────────────────────────────────────────
 

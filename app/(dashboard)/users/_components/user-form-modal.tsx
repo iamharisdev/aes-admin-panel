@@ -1,31 +1,76 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useFormik } from "formik";
 import { userService } from "@/lib/services/user.service";
 import { roleService } from "@/lib/services/role.service";
+import { hospitalService } from "@/lib/services/hospital.service";
+import { createUserSchema, updateUserSchema } from "@/lib/validations/user.schema";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
+import Dropdown from "@/components/ui/dropdown";
 import { X } from "lucide-react";
-import type { Role, User } from "@/types";
+import type { Role, Hospital, User } from "@/types";
 
 interface UserFormModalProps {
-  /** Pass a user to edit; omit for create */
   initial?: User;
   onClose: () => void;
   onSaved: () => void;
 }
 
 export default function UserFormModal({ initial, onClose, onSaved }: UserFormModalProps) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [email, setEmail] = useState(initial?.email ?? "");
-  const [phoneNumber, setPhoneNumber] = useState(initial?.phoneNumber ?? "");
-  const [password, setPassword] = useState("");
-  const [roleId, setRoleId] = useState(initial?.roleId ?? "");
-  const [isActive, setIsActive] = useState<"Y" | "N">(initial?.isActive ?? "Y");
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [hospitalsLoading, setHospitalsLoading] = useState(true);
+  const [apiError, setApiError] = useState("");
+
+  const formik = useFormik({
+    initialValues: {
+      name: initial?.name ?? "",
+      email: initial?.email ?? "",
+      phoneNumber: initial?.phoneNumber ?? "",
+      password: "",
+      roleId: initial?.roleId ?? "",
+      hospitalId: initial?.hospitalId ?? "",
+      isActive: (initial?.isActive ?? "Y") as "Y" | "N",
+    },
+    validationSchema: initial ? updateUserSchema : createUserSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      setApiError("");
+      try {
+        if (initial) {
+          await userService.update(initial.id, {
+            name: values.name,
+            email: values.email,
+            phoneNumber: values.phoneNumber || undefined,
+            roleId: values.roleId,
+            hospitalId: values.hospitalId || undefined,
+            isActive: values.isActive,
+          });
+        } else {
+          await userService.create({
+            name: values.name,
+            email: values.email,
+            phoneNumber: values.phoneNumber || undefined,
+            password: values.password,
+            roleId: values.roleId,
+            hospitalId: values.hospitalId || undefined,
+            isActive: values.isActive,
+          });
+        }
+        onSaved();
+        onClose();
+      } catch (err: unknown) {
+        setApiError(
+          (err as { response?: { data?: { message?: string } } })?.response?.data
+            ?.message ?? "Something went wrong."
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
 
   const loadRoles = useCallback(async () => {
     setRolesLoading(true);
@@ -33,53 +78,42 @@ export default function UserFormModal({ initial, onClose, onSaved }: UserFormMod
       const { data } = await roleService.getAll({ limit: 100 });
       setRoles(data.data);
     } catch {
-      setError("Failed to load roles.");
+      setApiError("Failed to load roles.");
     } finally {
       setRolesLoading(false);
     }
   }, []);
 
+  const loadHospitals = useCallback(async () => {
+    setHospitalsLoading(true);
+    try {
+      const { data } = await hospitalService.getAll({ limit: 100, isActive: "Y" });
+      setHospitals(data.data);
+    } catch {
+      setApiError("Failed to load hospitals.");
+    } finally {
+      setHospitalsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadRoles();
-  }, [loadRoles]);
+    loadHospitals();
+  }, [loadRoles, loadHospitals]);
 
-  async function handleSubmit() {
-    setError("");
-    if (!roleId) {
-      setError("Please select a role.");
-      return;
-    }
-    setLoading(true);
-    try {
-      if (initial) {
-        await userService.update(initial.id, {
-          name,
-          email,
-          phoneNumber: phoneNumber || undefined,
-          roleId,
-          isActive,
-        });
-      } else {
-        await userService.create({
-          name,
-          email,
-          phoneNumber: phoneNumber || undefined,
-          password,
-          roleId,
-          isActive,
-        });
-      }
-      onSaved();
-      onClose();
-    } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? "Something went wrong."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+  const roleOptions = roles
+    .filter((r) => r.name.toLowerCase() !== "super_admin")
+    .map((r) => ({ value: r.id, label: r.name }));
+
+  const hospitalOptions = hospitals.map((h) => ({
+    value: h.id,
+    label: h.name,
+  }));
+
+  const err = (field: keyof typeof formik.values) =>
+    formik.touched[field] && formik.errors[field]
+      ? formik.errors[field]
+      : undefined;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -101,84 +135,79 @@ export default function UserFormModal({ initial, onClose, onSaved }: UserFormMod
         </div>
 
         {/* Form */}
-        <form action={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+        <form onSubmit={formik.handleSubmit} noValidate className="flex flex-col flex-1 overflow-hidden">
           <div className="p-6 space-y-4 overflow-y-auto flex-1">
             <Input
               label="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              minLength={2}
               placeholder="e.g. John Smith"
+              {...formik.getFieldProps("name")}
+              error={err("name")}
             />
 
             <Input
               label="Email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
               placeholder="e.g. john@example.com"
+              {...formik.getFieldProps("email")}
+              error={err("email")}
             />
 
             <Input
               label="Phone number"
               type="tel"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="Optional"
+              placeholder="e.g. +923001234567"
+              {...formik.getFieldProps("phoneNumber")}
+              error={err("phoneNumber")}
             />
 
             {!initial && (
               <Input
                 label="Password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
                 placeholder="Min. 8 chars, 1 uppercase, 1 number, 1 special"
+                {...formik.getFieldProps("password")}
+                error={err("password")}
               />
             )}
 
-            {/* Role select */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">Role</label>
-              {rolesLoading ? (
-                <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
-              ) : (
-                <select
-                  value={roleId}
-                  onChange={(e) => setRoleId(e.target.value)}
-                  required
-                  className="w-full h-10 px-3 text-sm rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white text-gray-900"
-                >
-                  <option value="">Select a role…</option>
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
+            <Dropdown
+              label="Role"
+              required
+              loading={rolesLoading}
+              placeholder="Select a role…"
+              options={roleOptions}
+              value={formik.values.roleId}
+              onChange={(v) => formik.setFieldValue("roleId", v)}
+              onBlur={() => formik.setFieldTouched("roleId", true)}
+              error={err("roleId")}
+            />
 
-            {/* Status select */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">Status</label>
-              <select
-                value={isActive}
-                onChange={(e) => setIsActive(e.target.value as "Y" | "N")}
-                className="w-full h-10 px-3 text-sm rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white text-gray-900"
-              >
-                <option value="Y">Active</option>
-                <option value="N">Inactive</option>
-              </select>
-            </div>
+            <Dropdown
+              label="Hospital"
+              loading={hospitalsLoading}
+              placeholder="Select a hospital…"
+              options={hospitalOptions}
+              value={formik.values.hospitalId}
+              onChange={(v) => formik.setFieldValue("hospitalId", v)}
+              onBlur={() => formik.setFieldTouched("hospitalId", true)}
+              error={err("hospitalId")}
+            />
 
-            {error && (
+            <Dropdown
+              label="Status"
+              options={[
+                { value: "Y", label: "Active" },
+                { value: "N", label: "Inactive" },
+              ]}
+              value={formik.values.isActive}
+              onChange={(v) => formik.setFieldValue("isActive", v)}
+              onBlur={() => formik.setFieldTouched("isActive", true)}
+              error={err("isActive")}
+            />
+
+            {apiError && (
               <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
-                {error}
+                {apiError}
               </p>
             )}
           </div>
@@ -187,7 +216,7 @@ export default function UserFormModal({ initial, onClose, onSaved }: UserFormMod
             <Button type="button" variant="outline" fullWidth onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" fullWidth loading={loading}>
+            <Button type="submit" variant="primary" fullWidth loading={formik.isSubmitting}>
               {initial ? "Update" : "Create"}
             </Button>
           </div>

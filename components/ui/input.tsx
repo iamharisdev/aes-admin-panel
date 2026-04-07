@@ -84,7 +84,7 @@ export default function Input({
         </label>
       )}
 
-      <div className="relative flex items-center shadow-sm">
+      <div className="relative flex items-center">
         {hasLeft && (
           <span
             className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${
@@ -99,7 +99,7 @@ export default function Input({
           id={inputId}
           type={isPassword ? (showPassword ? "text" : "password") : type}
           className={[
-            "w-full rounded-xl border outline-none transition-all",
+            "w-full rounded-xl border outline-none transition-all shadow-sm",
             "focus:ring-2 focus:border-transparent",
             inputSz,
             hasLeft ? "pl-9" : "",

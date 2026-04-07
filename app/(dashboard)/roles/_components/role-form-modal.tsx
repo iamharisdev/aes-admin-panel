@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useFormik } from "formik";
 import { roleService } from "@/lib/services/role.service";
 import { permissionService } from "@/lib/services/permission.service";
+import { roleSchema } from "@/lib/validations/role.schema";
 import Button from "@/components/ui/button";
 import Pagination from "@/components/ui/pagination";
 import Input from "@/components/ui/input";
@@ -13,24 +15,68 @@ import type { Permission, Role } from "@/types";
 const PERM_LIMIT = 50;
 
 interface RoleFormModalProps {
-  /** Pass a role to edit; omit for create */
   initial?: Role;
   onClose: () => void;
   onSaved: () => void;
 }
 
 export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormModalProps) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<string>>(new Set());
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [permPagination, setPermPagination] = useState({ page: 1, total: 0, totalPages: 1 });
   const [permSearch, setPermSearch] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [apiError, setApiError] = useState("");
 
-  // Load permissions with pagination
+  const formik = useFormik({
+    initialValues: {
+      name: initial?.name ?? "",
+      description: initial?.description ?? "",
+    },
+    validationSchema: roleSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      setApiError("");
+      try {
+        const permissionIds = Array.from(selectedPermissionIds);
+
+        if (initial) {
+          await roleService.update(initial.id, {
+            name: values.name,
+            description: values.description,
+          });
+          if (permissionIds.length > 0) {
+            await roleService.assignPermissions(initial.id, { permissionIds });
+          } else {
+            const currentPermIds = initial.permissions?.map((rp) => rp.permission.id) ?? [];
+            if (currentPermIds.length > 0) {
+              await roleService.removePermissions(initial.id, { permissionIds: currentPermIds });
+            }
+          }
+        } else {
+          const { data } = await roleService.create({
+            name: values.name,
+            description: values.description,
+          });
+          const newRole = data.data;
+          if (permissionIds.length > 0) {
+            await roleService.assignPermissions(newRole.id, { permissionIds });
+          }
+        }
+        onSaved();
+        onClose();
+      } catch (err: unknown) {
+        setApiError(
+          (err as { response?: { data?: { message?: string } } })?.response?.data
+            ?.message ?? "Something went wrong."
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  // ── Permissions loading ───────────────────────────────────────────────────
+
   const loadPermissions = useCallback(async (page: number, search: string) => {
     setPermissionsLoading(true);
     try {
@@ -47,7 +93,7 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
         totalPages: pg?.totalPages ?? 1,
       });
     } catch {
-      setError("Failed to load permissions.");
+      setApiError("Failed to load permissions.");
     } finally {
       setPermissionsLoading(false);
     }
@@ -57,15 +103,14 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
     loadPermissions(1, permSearch);
   }, [loadPermissions, permSearch]);
 
-  // Pre-select permissions when editing
   useEffect(() => {
     if (initial?.permissions) {
-      const ids = new Set(initial.permissions.map((rp) => rp.permission.id));
-      setSelectedPermissionIds(ids);
+      setSelectedPermissionIds(new Set(initial.permissions.map((rp) => rp.permission.id)));
     }
   }, [initial]);
 
-  // Group current page permissions by resource
+  // ── Permission helpers ────────────────────────────────────────────────────
+
   const grouped = useMemo(() => {
     const map = new Map<string, Permission[]>();
     for (const p of permissions) {
@@ -79,11 +124,7 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
   function togglePermission(id: string) {
     setSelectedPermissionIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   }
@@ -94,11 +135,7 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
     setSelectedPermissionIds((prev) => {
       const next = new Set(prev);
       for (const p of permsInGroup) {
-        if (allSelected) {
-          next.delete(p.id);
-        } else {
-          next.add(p.id);
-        }
+        allSelected ? next.delete(p.id) : next.add(p.id);
       }
       return next;
     });
@@ -107,55 +144,13 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
   function selectAllOnPage() {
     setSelectedPermissionIds((prev) => {
       const next = new Set(prev);
-      for (const p of permissions) {
-        next.add(p.id);
-      }
+      permissions.forEach((p) => next.add(p.id));
       return next;
     });
   }
 
   function deselectAll() {
     setSelectedPermissionIds(new Set());
-  }
-
-  async function handleSubmit() {
-    setError("");
-    setLoading(true);
-    try {
-      const permissionIds = Array.from(selectedPermissionIds);
-
-      if (initial) {
-        // Update role name/description
-        await roleService.update(initial.id, { name, description });
-        // Assign permissions (replaces existing)
-        if (permissionIds.length > 0) {
-          await roleService.assignPermissions(initial.id, { permissionIds });
-        } else {
-          // If no permissions selected, remove all
-          const currentPermIds = initial.permissions?.map((rp) => rp.permission.id) ?? [];
-          if (currentPermIds.length > 0) {
-            await roleService.removePermissions(initial.id, { permissionIds: currentPermIds });
-          }
-        }
-      } else {
-        // Create the role first
-        const { data } = await roleService.create({ name, description });
-        const newRole = data.data;
-        // Then assign permissions if any selected
-        if (permissionIds.length > 0) {
-          await roleService.assignPermissions(newRole.id, { permissionIds });
-        }
-      }
-      onSaved();
-      onClose();
-    } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? "Something went wrong."
-      );
-    } finally {
-      setLoading(false);
-    }
   }
 
   const actionColors: Record<string, string> = {
@@ -187,24 +182,22 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
         </div>
 
         {/* Form */}
-        <form action={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+        <form onSubmit={formik.handleSubmit} noValidate className="flex flex-col flex-1 overflow-hidden">
           <div className="p-6 space-y-4 overflow-y-auto flex-1">
             <Input
               label="Role name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              minLength={2}
               placeholder="e.g. Hospital Manager"
+              {...formik.getFieldProps("name")}
+              error={formik.touched.name && formik.errors.name ? formik.errors.name : undefined}
             />
 
             <Textarea
               label="Description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder="What does this role allow?"
               hint="Optional — helps identify the role's purpose."
+              {...formik.getFieldProps("description")}
+              error={formik.touched.description && formik.errors.description ? formik.errors.description : undefined}
             />
 
             {/* Permissions Section */}
@@ -236,20 +229,15 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
               </div>
 
               {/* Search permissions */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Search permissions..."
-                  value={permSearch}
-                  onChange={(e) => setPermSearch(e.target.value)}
-                  className="w-full h-9 pl-9 pr-3 text-sm rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all placeholder-gray-400"
-                />
-              </div>
+              <Input
+                value={permSearch}
+                onChange={(e) => setPermSearch(e.target.value)}
+                placeholder="Search permissions..."
+                leftIcon={<Search className="w-4 h-4" />}
+              />
 
-              {/* Permissions list + fixed pagination */}
+              {/* Permissions list */}
               <div className="border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-                {/* Scrollable permissions area */}
                 <div className="max-h-64 overflow-y-auto">
                   {permissionsLoading ? (
                     <div className="p-6 space-y-2">
@@ -264,16 +252,12 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
                   ) : (
                     <div className="divide-y divide-gray-100">
                       {Array.from(grouped.entries()).map(([resource, perms]) => {
-                        const allInGroupSelected = perms.every((p) =>
-                          selectedPermissionIds.has(p.id)
-                        );
+                        const allInGroupSelected = perms.every((p) => selectedPermissionIds.has(p.id));
                         const someInGroupSelected =
-                          !allInGroupSelected &&
-                          perms.some((p) => selectedPermissionIds.has(p.id));
+                          !allInGroupSelected && perms.some((p) => selectedPermissionIds.has(p.id));
 
                         return (
                           <div key={resource}>
-                            {/* Resource header */}
                             <button
                               type="button"
                               onClick={() => toggleResource(resource)}
@@ -289,22 +273,15 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
                                     : "border-gray-300",
                                 ].join(" ")}
                               >
-                                {allInGroupSelected && (
-                                  <Check className="w-3 h-3 text-white" />
-                                )}
-                                {someInGroupSelected && (
-                                  <div className="w-2 h-0.5 bg-green-600 rounded" />
-                                )}
+                                {allInGroupSelected && <Check className="w-3 h-3 text-white" />}
+                                {someInGroupSelected && <div className="w-2 h-0.5 bg-green-600 rounded" />}
                               </div>
-                              <span className="text-sm font-medium text-gray-700 capitalize">
-                                {resource}
-                              </span>
+                              <span className="text-sm font-medium text-gray-700 capitalize">{resource}</span>
                               <span className="text-xs text-gray-400 ml-auto">
                                 {perms.filter((p) => selectedPermissionIds.has(p.id)).length}/{perms.length}
                               </span>
                             </button>
 
-                            {/* Permission items */}
                             <div className="px-4 py-1">
                               {perms.map((p) => {
                                 const selected = selectedPermissionIds.has(p.id);
@@ -318,18 +295,12 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
                                     <div
                                       className={[
                                         "w-4 h-4 rounded border-2 flex items-center justify-center transition-colors shrink-0",
-                                        selected
-                                          ? "bg-green-600 border-green-600"
-                                          : "border-gray-300",
+                                        selected ? "bg-green-600 border-green-600" : "border-gray-300",
                                       ].join(" ")}
                                     >
-                                      {selected && (
-                                        <Check className="w-3 h-3 text-white" />
-                                      )}
+                                      {selected && <Check className="w-3 h-3 text-white" />}
                                     </div>
-                                    <span className="text-sm text-gray-700 flex-1 text-left">
-                                      {p.name}
-                                    </span>
+                                    <span className="text-sm text-gray-700 flex-1 text-left">{p.name}</span>
                                     <span
                                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                         actionColors[p.action] ?? "bg-gray-100 text-gray-700"
@@ -348,23 +319,20 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
                   )}
                 </div>
 
-                {/* Fixed pagination bar at bottom */}
-              
-                  <div className="shrink-0">
-                    <Pagination
-                      page={permPagination.page}
-                      totalPages={permPagination.totalPages}
-                      total={permPagination.total}
-                      onPageChange={(p) => loadPermissions(p, permSearch)}
-                    />
-                  </div>
-             
+                <div className="shrink-0">
+                  <Pagination
+                    page={permPagination.page}
+                    totalPages={permPagination.totalPages}
+                    total={permPagination.total}
+                    onPageChange={(p) => loadPermissions(p, permSearch)}
+                  />
+                </div>
               </div>
             </div>
 
-            {error && (
+            {apiError && (
               <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
-                {error}
+                {apiError}
               </p>
             )}
           </div>
@@ -373,7 +341,7 @@ export default function RoleFormModal({ initial, onClose, onSaved }: RoleFormMod
             <Button type="button" variant="outline" fullWidth onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" fullWidth loading={loading}>
+            <Button type="submit" variant="primary" fullWidth loading={formik.isSubmitting}>
               {initial ? "Update" : "Create"}
             </Button>
           </div>

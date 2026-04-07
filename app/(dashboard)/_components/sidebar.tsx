@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, ShieldCheck, LogOut, UserCircle } from "lucide-react";
+import { Users, ShieldCheck, LogOut, UserCircle, Building2 } from "lucide-react";
 
 const navItems = [
   {
@@ -19,6 +19,11 @@ const navItems = [
     href: "/permissions",
     label: "Permissions",
     icon: <ShieldCheck className="w-4 h-4" />,
+  },
+  {
+    href: "/hospitals",
+    label: "Hospitals",
+    icon: <Building2 className="w-4 h-4" />,
   },
 ];
 
