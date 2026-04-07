@@ -2,30 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, ShieldCheck, LogOut, UserCircle, Building2 } from "lucide-react";
-
-const navItems = [
-  {
-    href: "/users",
-    label: "Users",
-    icon: <UserCircle className="w-4 h-4" />,
-  },
-  {
-    href: "/roles",
-    label: "Roles",
-    icon: <Users className="w-4 h-4" />,
-  },
-  {
-    href: "/permissions",
-    label: "Permissions",
-    icon: <ShieldCheck className="w-4 h-4" />,
-  },
-  {
-    href: "/hospitals",
-    label: "Hospitals",
-    icon: <Building2 className="w-4 h-4" />,
-  },
-];
+import { ShieldCheck, LogOut } from "lucide-react";
+import { navItems } from "@/constant";
 
 export default function Sidebar() {
   const pathname = usePathname();

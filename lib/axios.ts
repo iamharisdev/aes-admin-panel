@@ -6,9 +6,10 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { startLoading, stopLoading } from "@/lib/loading";
+import { API_BASE_URL } from "@/constant";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: API_BASE_URL,
   timeout: 10_000,
   headers: { "Content-Type": "application/json" },
 });
@@ -50,7 +51,7 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem("refreshToken");
         const { data } = await axios.post<{ data: { accessToken: string } }>(
-          `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh-token`,
+          `${API_BASE_URL}/auth/refresh-token`,
           { refreshToken }
         );
         const newToken = data.data.accessToken;
